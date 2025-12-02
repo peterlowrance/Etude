@@ -131,14 +131,12 @@ def run_stage_2_preprocess(config: dict, verbose: bool = False):
                 print(f"\n    > Processing beats for {song_name}...")
             
             spleeter_cmd = [
-                "conda", "run", "-n", project_config['env']['spleeter_env_name'],
                 "python", "scripts/run_separation.py",
                 "--input", str(origin_wav), "--output", str(sep_npy_path)
             ]
             subprocess.run(spleeter_cmd, check=True, capture_output=True)
 
             beat_detection_cmd = [
-                "conda", "run", "-n", project_config['env']['madmom_env_name'],
                 "python", "scripts/run_beat_detection.py",
                 "--input_npy", str(sep_npy_path),
                 "--output_json", str(beat_pred_path),

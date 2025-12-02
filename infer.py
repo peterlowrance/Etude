@@ -86,14 +86,12 @@ class InferencePipeline:
     def _run_stage2_structuralize(self, audio_path: Path):
         """Runs the beat detection and tempo analysis process."""
         print("\n[STAGE 2] Structuralizing tempo information.")
-        spleeter_cmd = [ "conda", "run", "-n", self.project_config['env']['spleeter_env_name'],
-                         "python", "scripts/run_separation.py",
+        spleeter_cmd = [ "python", "scripts/run_separation.py",
                          "--input", str(audio_path), "--output", str(self.work_dir / "sep.npy") ]
         print("    > Running source separation for beat detection...")
         self._run_command(spleeter_cmd)
 
-        beat_detection_cmd = [ "conda", "run", "-n", self.project_config['env']['madmom_env_name'],
-                               "python", "scripts/run_beat_detection.py",
+        beat_detection_cmd = [ "python", "scripts/run_beat_detection.py",
                                "--input_npy", str(self.work_dir / "sep.npy"),
                                "--output_json", str(self.work_dir / "beat_pred.json"),
                                "--model_path", self.config['structuralize']['beat_model_path'],

@@ -4,10 +4,10 @@ torch
 torchaudio
 torchvision
 tqdm
-transformers
+transformers<5.0.0
 pretty_midi
 PyYAML
 yt-dlp
 demucs
-soundfile
+soundfile==0.12.1
 madmom

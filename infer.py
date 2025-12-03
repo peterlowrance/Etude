@@ -140,26 +140,58 @@ class InferencePipeline:
         else:
             print("[WARN] Model generated an empty sequence.")
 
-    def run(self, audio_source: str, target_attributes: dict, final_filename: str, decode_only: bool = False):
-        """Executes the inference pipeline, conditionally skipping preprocessing."""
-        if not decode_only:
-            # --- Full pipeline ---
-            audio_path = self._prepare_audio(audio_source)
-            self._run_stage1_extract(audio_path)
-            self._run_stage2_structuralize(audio_path)
-        else:
-            # --- Decode-only shortcut ---
-            print("[INFO] Skipping Stages 1 & 2.")
-            required_files = ["extract.json", "tempo.json", "volume.json"]
-            for f_name in required_files:
-                if not (self.work_dir / f_name).exists():
-                    print(f"[ERROR] Decode-only mode failed: Missing required file '{f_name}' in {self.work_dir}", file=sys.stderr)
-                    print("        Please run the full pipeline once without the flag to generate these files.", file=sys.stderr)
-                    sys.exit(1)
-            print("[INFO] All required intermediate files found.")
+    def run(self, audio_source: str, target_attributes: dict, final_filename: str, start_from: str = 'extract'):
+        """Executes the inference pipeline, conditionally skipping stages."""
         
-        # The decode stage runs in both cases
-        self._run_stage3_decode(target_attributes, final_filename)
+        # Determine which stages to run based on start_from
+        # Stages: extract -> structuralize -> decode
+        stages = ['extract', 'structuralize', 'decode']
+        if start_from not in stages:
+             print(f"[ERROR] Invalid start_from stage: {start_from}. Must be one of {stages}", file=sys.stderr)
+             sys.exit(1)
+             
+        start_idx = stages.index(start_from)
+        run_extract = (start_idx <= 0)
+        run_struct = (start_idx <= 1)
+        run_decode = (start_idx <= 2) # Always true effectively
+
+        # Prepare audio is needed if we run any processing stage, or if we need it for checking
+        # But if we skip extract, we assume intermediate files exist.
+        # However, stage 2 needs the audio file for separation.
+        
+        local_audio_path = self.work_dir / "origin.wav"
+        
+        # If running from scratch or structuralize, we need the audio
+        if run_extract or run_struct:
+            if not local_audio_path.exists() or run_extract:
+                 # If we are starting from extract, we always prepare. 
+                 # If starting from structuralize, we need audio. If it's missing, we must prepare it.
+                 self._prepare_audio(audio_source)
+            else:
+                 print(f"[INFO] Found existing audio at {local_audio_path}, skipping download/copy.")
+
+        # --- Stage 1: Extract ---
+        if run_extract:
+            self._run_stage1_extract(local_audio_path)
+        else:
+            print("[INFO] Skipping Stage 1 (Extract). Checking for required files...")
+            if not (self.work_dir / "extract.json").exists() or not (self.work_dir / "volume.json").exists():
+                 print("[ERROR] Missing 'extract.json' or 'volume.json'. Cannot skip Stage 1.", file=sys.stderr)
+                 sys.exit(1)
+
+        # --- Stage 2: Structuralize ---
+        if run_struct:
+            self._run_stage2_structuralize(local_audio_path)
+        else:
+            print("[INFO] Skipping Stage 2 (Structuralize). Checking for required files...")
+            if not (self.work_dir / "tempo.json").exists():
+                 print("[ERROR] Missing 'tempo.json'. Cannot skip Stage 2.", file=sys.stderr)
+                 sys.exit(1)
+
+        # --- Stage 3: Decode ---
+        if run_decode:
+            self._run_stage3_decode(target_attributes, final_filename)
+
         print("\n[INFO] Inference pipeline finished successfully!")
 
 
@@ -170,7 +202,10 @@ def main():
 
     source_group = parser.add_mutually_exclusive_group(required=True)
     source_group.add_argument("--input", type=str, help="Path or URL to the source audio file for a full run.")
-    source_group.add_argument("--decode-only", action="store_true", help="Skip preprocessing and run decode stage only, using files in 'outputs/inference/temp'.")
+    source_group.add_argument("--decode-only", action="store_true", help="[Deprecated] Use --start-from decode instead.")
+    
+    parser.add_argument("--start-from", type=str, default="extract", choices=["extract", "structuralize", "decode"],
+                        help="Start the pipeline from a specific stage. Useful for resuming crashed runs.")
     
     attr_group = parser.add_argument_group('Target Attribute Controls')
     attr_group.add_argument("--polyphony", type=int, default=1, choices=[0, 1, 2], help="Target bin for Relative Polyphony.")
@@ -194,13 +229,18 @@ def main():
         "sustain_bin": args.sustain, 
         "pitch_overlap_bin": args.overlap
     }
+    
+    # Handle legacy decode-only flag
+    start_from = args.start_from
+    if args.decode_only:
+        start_from = 'decode'
         
     pipeline = InferencePipeline(config)
     pipeline.run(
         audio_source=args.input, 
         target_attributes=target_attributes, 
         final_filename=args.output_name,
-        decode_only=args.decode_only
+        start_from=start_from
     )
 
 if __name__ == "__main__":

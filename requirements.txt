@@ -14,3 +14,4 @@ yt-dlp
 demucs
 soundfile==0.12.1
 madmom
+torchcodec

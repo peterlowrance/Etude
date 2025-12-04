@@ -150,7 +150,14 @@ def main():
         if not madmom_path.exists():
              print(f"[ERROR] Provided path does not exist: {madmom_path}")
              return False
-        print(f"Patching madmom at provided path: {madmom_path}")
+        
+        # Check if the provided path is the repo root (containing a 'madmom' subdir)
+        # or the package directory itself.
+        if (madmom_path / "madmom").exists() and (madmom_path / "madmom").is_dir():
+            print(f"Detected repository root. Patching inner 'madmom' directory at: {madmom_path / 'madmom'}")
+            madmom_path = madmom_path / "madmom"
+        else:
+            print(f"Patching madmom at provided path: {madmom_path}")
     else:
         madmom_path = find_madmom()
         

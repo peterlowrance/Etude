@@ -140,7 +140,20 @@ def fix_numpy_float(madmom_path):
     return True
 
 def main():
-    madmom_path = find_madmom()
+    import argparse
+    parser = argparse.ArgumentParser(description="Patch madmom for Python 3.12+ and NumPy 1.24+")
+    parser.add_argument("--path", type=str, help="Path to madmom source or installation directory", default=None)
+    args = parser.parse_args()
+
+    if args.path:
+        madmom_path = Path(args.path)
+        if not madmom_path.exists():
+             print(f"[ERROR] Provided path does not exist: {madmom_path}")
+             return False
+        print(f"Patching madmom at provided path: {madmom_path}")
+    else:
+        madmom_path = find_madmom()
+        
     if not madmom_path:
         print("[ERROR] Could not locate madmom installation directory.")
         return False
